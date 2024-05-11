@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -26,15 +27,71 @@ public class SudokoGameManager : MonoBehaviour
     public GameObject parentCanvas;
     private List<GameObject> fields = new List<GameObject>();
 
+    public delegate void PotentialNumbersUpdatedDelegate(HashSet<int>[,] potentialNumbers);
+    public PotentialNumbersUpdatedDelegate OnPotentialNumbersUpdated;
 
+    private SudokuGame _sudokuGame;
 
     // Start is called before the first frame update
     void Start()
     {
+        _sudokuGame = new SudokuGame();
+
+        InitializeSudokuGUI();
+    }
+
+    public void OnFieldChanged(int x, int y, int oldNumber, int newNumber)
+    {
+        if (newNumber == SudokoField.EMPTY_FIELD)
+        {
+            if (oldNumber != SudokoField.EMPTY_FIELD)
+            {
+                _sudokuGame.SetNumberField(x, y, null);
+                UpdatePotentialFields();
+            }
+            return;
+        }
+
+        Debug.Log("Processing field change in game-manager");
+
+        bool validChange = _sudokuGame.SetNumberField(x, y, newNumber);
+        // check for any collisions on the row,col and square of the changed field
+        if (validChange)
+        {
+            UpdatePotentialFields();
+        }
+        else
+        {
+            Debug.LogWarning("Collision detected!");
+            GetSodukoField(x, y).SetNumberField(oldNumber == SudokoField.EMPTY_FIELD ? null : oldNumber);
+        }
+    }
+
+    private void UpdatePotentialFields()
+    {
+        HashSet<int>[,] potentialNumbersForFields = _sudokuGame.GeneratePotentialNumbersForFields();
+
+        for (int fx = 0; fx < 9; fx++)
+        {
+            for (int fy = 0; fy < 9; fy++)
+            {
+                GetSodukoField(fx, fy).UpdatePotentialNumbers(potentialNumbersForFields[fx, fy]);
+            }
+        }
+    }
+
+    public SudokoField GetSodukoField(int x, int y)
+    {
+        GameObject g = fields[y * 9 + x];
+        return g.GetComponent<SudokoField>();
+    }
+
+    private void InitializeSudokuGUI()
+    {
         sodukoFieldPrototype = Resources.Load("SodukoField") as GameObject;
         Instantiate(
             sodukoFieldPrototype,
-            new Vector3(100,0,0),
+            new Vector3(100, 0, 0),
             Quaternion.identity,
             parentCanvas.transform);
         for (int y = 0; y < 9; y++)
@@ -50,158 +107,22 @@ public class SudokoGameManager : MonoBehaviour
                 newField.xpos = x;
                 newField.ypos = y;
 
+                /* get sqaure associated with x,y coordinates
+                 * squares are layouted as followed:
+                 * 6 7 8
+                 * 3 4 5
+                 * 0 1 2
+                 */
+                int square = x / 3 + 3 * (y / 3);
+
                 // color fields form every other square
-                if (GetSquare(x, y) % 2 == 0)
+                if (square % 2 == 0)
                 {
-                    newFieldObject.GetComponent<Image>().color = new Color(0.8f,0.8f,1f,1f);
+                    newFieldObject.GetComponent<Image>().color = new Color(0.8f, 0.8f, 1f, 1f);
                 }
 
                 fields.Add(newFieldObject);
             }
         }
-    }
-
-    public void OnFieldChanged(int x, int y, int oldNumber, int newNumber)
-    {
-        if (newNumber == SudokoField.EMPTY_FIELD)
-        {
-            if (oldNumber != SudokoField.EMPTY_FIELD)
-            {
-                ResetPotentialFields(x, y, oldNumber);
-            }
-            return;
-        }
-        Debug.Log("processing field change in game-manager");
-        // check for any collisions on the row,col and square of the changed field
-        if (CheckForCollision(x,y,newNumber))
-        {
-            Debug.LogWarning("Collision detected!");
-        }
-        else
-        {
-            UpdatePotentialFields(x, y, newNumber, false);
-        }
-    }
-
-    private void ResetPotentialFields(int x, int y, int number)
-    {
-        for (int i = 0; i < 9; i++)
-        {
-            if (!CheckForCollision(x, i, number))
-            {
-                GetSodukoField(x, i).potentialNumbersData[number - 1] = true;
-                GetSodukoField(x, i).UpdatePotentialNumbers();
-            }
-            if (!CheckForCollision(i, y, number))
-            {
-                GetSodukoField(i, y).potentialNumbersData[number - 1] = true;
-                GetSodukoField(i, y).UpdatePotentialNumbers();
-            }
-        }
-
-        int squareX = (x / 3) * 3;
-        int squareY = (y / 3) * 3;
-        for (int yi = squareY; yi < squareY + 3; yi++)
-            for (int xi = squareX; xi < squareX + 3; xi++)
-            {
-                if (!CheckForCollision(xi, yi, number))
-                {
-                    GetSodukoField(xi, yi).potentialNumbersData[number - 1] = true;
-                    GetSodukoField(xi, yi).UpdatePotentialNumbers();
-                }
-            }
-    }
-
-    private bool CheckForCollision(int x, int y, int number)
-    {
-        return CheckRow(x, y, number) || CheckCol(x, y, number) || CheckSquare(x, y, number);
-    }
-
-    private void UpdatePotentialFields(int x, int y, int number, bool possible)
-    {
-        for (int i = 0; i < 9; i++)
-        {
-            GetSodukoField(x, i).potentialNumbersData[number - 1] = possible;
-            GetSodukoField(x, i).UpdatePotentialNumbers();
-            GetSodukoField(i, y).potentialNumbersData[number - 1] = possible;
-            GetSodukoField(i, y).UpdatePotentialNumbers();
-        }
-
-        int squareX = (x / 3) * 3;
-        int squareY = (y / 3) * 3;
-        for (int yi = squareY; yi < squareY + 3; yi++)
-            for (int xi = squareX; xi < squareX + 3; xi++)
-            {
-                GetSodukoField(xi, yi).potentialNumbersData[number - 1] = possible;
-                GetSodukoField(xi, yi).UpdatePotentialNumbers();
-            }
-    }
-
-    private bool CheckRow(int x, int y, int number)
-    {
-        for (int i = 0; i < 9; i++)
-        {
-            if (i == x) continue;
-            if (GetSodukoField(i, y).number == number)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private bool CheckCol(int x, int y, int number)
-    {
-        for (int i = 0; i < 9; i++)
-        {
-            if (i == y) continue;
-            if(GetSodukoField(x,i).number == number)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private bool CheckSquare(int x, int y, int number)
-    {
-        int squareX = (x / 3) * 3;
-        int squareY = (y / 3) * 3;
-        for (int yi = squareY; yi < squareY + 3; yi++)
-            for (int xi = squareX; xi < squareX + 3; xi++)
-            {
-                if (xi == x && yi == y) continue;
-                if (GetSodukoField(xi, yi).number == number)
-                {
-                    return true;
-                }
-            }
-
-        return false;
-    }
-
-    /* get sqaure associated with x,y coordinates
-     * squares are layouted as followed:
-     * 6 7 8
-     * 3 4 5
-     * 0 1 2
-     */
-    public static int GetSquare(int x, int y)
-    {
-        return x / 3 + 3 * (y / 3);
-    }
-
-    public SudokoField GetSodukoField(int x, int y)
-    {
-        GameObject g = fields[y * 9 + x];
-        return g.GetComponent<SudokoField>();
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
     }
 }

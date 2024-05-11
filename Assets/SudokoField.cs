@@ -15,7 +15,6 @@ public class SudokoField : MonoBehaviour
 
     public bool[] potentialNumbersData = new bool[9];
 
-    // This field is either
     public int number = EMPTY_FIELD;
 
     // Start is called before the first frame update
@@ -66,6 +65,12 @@ public class SudokoField : MonoBehaviour
         SudokoGameManager.instance.OnFieldChanged(xpos, ypos, oldNumber, number);
     }
 
+    public void SetNumberField(int? newNumber)
+    {
+        numberInput.text = newNumber == null ? "" : newNumber.ToString();
+        number = newNumber ?? EMPTY_FIELD;
+    }
+
     private void SetPotentialNumbersVisible(bool visible)
     {
         if (visible)
@@ -89,6 +94,14 @@ public class SudokoField : MonoBehaviour
         for (int i = 0; i < potentialNumbers.Length; i++)
         {
             potentialNumbers[i].enabled = potentialNumbersData[i];
+        }
+    }
+
+    public void UpdatePotentialNumbers(HashSet<int> newPotentialNumbers)
+    {
+        for (int i = 0; i < potentialNumbers.Length; i++)
+        {
+            potentialNumbers[i].enabled = newPotentialNumbers.Contains(i+1);
         }
     }
 }
