@@ -36,8 +36,23 @@ public class SudokoGameManager : MonoBehaviour
     void Start()
     {
         _sudokuGame = new SudokuGame();
+        _sudokuGame.SetFields(new int?[,]
+        {
+            {null,null,8,null,null,null,null,null,null, },
+            {null,1,null,null,2,null,null,3,9, },
+            {5,null,null,null,4,null,null,null,8, },
+            {null,null,2,null,9,null,null,null,null, },
+            {null,9,1,5,null,2,null,null,null, },
+            {null,null,null,null,null,1,null,6,null, },
+            {null,null,null,9,null,null,null,null,4, },
+            {8,null,3,null,null,null,5,null,null, },
+            {null,4,null,7,null,null,6,null,null, },
+        });
 
         InitializeSudokuGUI();
+
+
+        UpdatePotentialFields();
     }
 
     public void OnFieldChanged(int x, int y, int oldNumber, int newNumber)
@@ -69,13 +84,19 @@ public class SudokoGameManager : MonoBehaviour
 
     private void UpdatePotentialFields()
     {
-        HashSet<int>[,] potentialNumbersForFields = _sudokuGame.GeneratePotentialNumbersForFields();
+        (HashSet<int>[,] potentialNumbersForFields, Dictionary<(int, int), int> nextMoveDict) = _sudokuGame.GeneratePotentialNumbersForFields();
 
         for (int fx = 0; fx < 9; fx++)
         {
             for (int fy = 0; fy < 9; fy++)
             {
-                GetSodukoField(fx, fy).UpdatePotentialNumbers(potentialNumbersForFields[fx, fy]);
+                SudokoField field = GetSodukoField(fx, fy);
+                field.UpdatePotentialNumbers(potentialNumbersForFields[fx, fy]);
+
+                if (nextMoveDict.ContainsKey((fx, fy)))
+                {
+                    field.SetFieldColor(new Color(0.2f, 0.8f, 0.2f, 1.0f));
+                }
             }
         }
     }
@@ -106,6 +127,12 @@ public class SudokoGameManager : MonoBehaviour
                 SudokoField newField = newFieldObject.GetComponent<SudokoField>();
                 newField.xpos = x;
                 newField.ypos = y;
+
+                int? number = _sudokuGame.Fields()[x, y];
+                if (number.HasValue)
+                {
+                    newField.SetNumberField(number.Value);
+                }
 
                 /* get sqaure associated with x,y coordinates
                  * squares are layouted as followed:

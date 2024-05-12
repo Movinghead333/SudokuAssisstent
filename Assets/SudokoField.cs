@@ -18,7 +18,7 @@ public class SudokoField : MonoBehaviour
     public int number = EMPTY_FIELD;
 
     // Start is called before the first frame update
-    void Start()
+    void Awake()
     {
         potentialNumbers = potentialNumbersParent.GetComponentsInChildren<Text>();
         for (int i = 0; i < potentialNumbersData.Length; i++)
@@ -69,6 +69,11 @@ public class SudokoField : MonoBehaviour
     {
         numberInput.text = newNumber == null ? "" : newNumber.ToString();
         number = newNumber ?? EMPTY_FIELD;
+    }
+
+    public void SetFieldColor(Color color)
+    {
+        gameObject.GetComponent<Image>().color = color;
     }
 
     private void SetPotentialNumbersVisible(bool visible)

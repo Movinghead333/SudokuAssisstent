@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 public class SudokuGame
@@ -107,7 +108,7 @@ public class SudokuGame
         return _fields.Cast<int?>().All(val => val.HasValue);
     }
 
-    public HashSet<int>[,] GeneratePotentialNumbersForFields()
+    public (HashSet<int>[,], Dictionary<(int, int), int>) GeneratePotentialNumbersForFields()
     {
         HashSet<int>[,] potentialNumbersForFields = new HashSet<int>[9, 9];
         for (int x = 0; x < 9; x++)
@@ -129,6 +130,9 @@ public class SudokuGame
 
                 int number = _fields[x, y].Value;
 
+                // Since this field is already occupied, there are no potential numbers left
+                potentialNumbersForFields[x, y] = new HashSet<int>();
+
                 for (int i = 0; i < 9; i++)
                 {
                     potentialNumbersForFields[i, y].Remove(number);
@@ -148,8 +152,64 @@ public class SudokuGame
             }
         }
 
-        return potentialNumbersForFields;
-    }
+        // Testing
+
+        // For each column find all numbers that only occur in one potential numbers set
+        // Then find those number fields and set the potential numbers set to the only remaining option
+        Dictionary<(int, int), int> nextMovesDict = new Dictionary<(int, int), int>();
+
+        List<List<(int, int)>> indexLists = new List<List<(int, int)>>();
+
+        for (int i = 0; i < 9; i++)
+        {
+            indexLists.Add(GetSquareIndexSet(i));
+            indexLists.Add(GetRowIndexList(i));
+            indexLists.Add(GetColumnIndexList(i));
+        }
+
+        foreach (var indexList in indexLists)
+        {
+            int[] occurences = new int[9];
+            Array.Fill(occurences, 0);
+
+            foreach (var coordinatePair in indexList)
+            {
+                foreach (int number in potentialNumbersForFields[coordinatePair.Item1, coordinatePair.Item2])
+                {
+                    occurences[number - 1]++;
+                }
+            }
+
+            HashSet<int> nextMoveNumbers = new HashSet<int>();
+            for (int i = 0; i < occurences.Length; i++)
+            {
+                if (occurences[i] == 1)
+                {
+                    nextMoveNumbers.Add(i + 1);
+                }
+            }
+
+            foreach (var coordinatePair in indexList)
+            {
+                HashSet<int> intersection = potentialNumbersForFields[coordinatePair.Item1, coordinatePair.Item2].Intersect(nextMoveNumbers).ToHashSet();
+
+                if (intersection.Count == 1)
+                {
+                    nextMovesDict[coordinatePair] = intersection.ToList()[0];
+                }
+            }
+        }
+
+        foreach (var nextMoveEntry in nextMovesDict)
+        {
+            Console.WriteLine($"{nextMoveEntry.Key.Item1}, {nextMoveEntry.Key.Item1}: {nextMoveEntry.Value}");
+            potentialNumbersForFields[nextMoveEntry.Key.Item1, nextMoveEntry.Key.Item2] = new HashSet<int> { nextMoveEntry.Value };
+        }
+
+        // Testing end
+
+        return (potentialNumbersForFields, nextMovesDict);
+}
 
     /// <summary>
     /// Check if the square where the number field x,y lies in is valid.
@@ -222,5 +282,53 @@ public class SudokuGame
         }
 
         return numbersList.Count == numbersList.ToHashSet().Count;
+    }
+
+    /// <summary>
+    /// 6 7 8
+    /// 3 4 5
+    /// 0 1 2
+    /// </summary>
+    /// <param name="squareIndex"></param>
+    /// <returns></returns>
+    private List<(int, int)> GetSquareIndexSet(int squareIndex)
+    {
+        List<(int, int)> squareIndexList = new List<(int, int)>(squareIndex);
+        int squareXOffset = (squareIndex % 3) * 3;
+        int squareYOffset = (squareIndex / 3) * 3;
+
+        for (int x = 0; x < 3; x++)
+        {
+            for (int y = 0; y < 3; y++)
+            {
+                squareIndexList.Add((squareXOffset + x, squareYOffset + y));
+            }
+        }
+
+        return squareIndexList;
+    }
+
+    private List<(int, int)> GetRowIndexList(int rowIndex)
+    {
+        List<(int, int)> rowIndexList = new List<(int, int)>();
+
+        for (int x = 0; x < 9; x++)
+        {
+            rowIndexList.Add((x, rowIndex));
+        }
+
+        return rowIndexList;
+    }
+
+    private List<(int, int)> GetColumnIndexList(int columnIndex)
+    {
+        List<(int, int)> columnIndexList = new List<(int, int)>();
+
+        for (int y = 0; y < 9; y++)
+        {
+            columnIndexList.Add((columnIndex, y));
+        }
+
+        return columnIndexList;
     }
 }
